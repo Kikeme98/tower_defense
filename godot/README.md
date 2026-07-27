@@ -6,6 +6,9 @@ abrir una ventana.
 
 ## Estado
 
+**Toda la lógica del juego está portada y verificada.** Lo que queda es la capa
+visual: interfaz, modelos y efectos.
+
 | Parte | Estado |
 |---|---|
 | Aleatoriedad con semilla y ruido | ✅ portado |
@@ -16,7 +19,7 @@ abrir una ventana.
 | Enemigos: daño en tres capas y venenos | ✅ portado y verificado |
 | Catálogo de torres y estadísticas | ✅ portado y verificado |
 | Director de oleadas | ✅ portado y verificado |
-| Cartas y draft | ⬜ pendiente |
+| Cartas y draft | ✅ portado y verificado |
 | Interfaz | ⬜ pendiente |
 | Agua, partículas, modelos | ⬜ pendiente |
 
@@ -29,6 +32,7 @@ GODOT=/Applications/Godot.app/Contents/MacOS/Godot
 $GODOT --headless --script tests/test_mapgen.gd   # generación del mapa
 $GODOT --headless --script tests/test_combat.gd   # daño en tres capas y balance
 $GODOT --headless --script tests/test_towers.gd   # torres, terreno y oleadas
+$GODOT --headless --script tests/test_cards.gd    # draft roguelike
 
 # Ver el mapa: renderiza y guarda shot.png
 $GODOT --quit-after 300 res://scenes/main.tscn -- --shot --sectors=4
