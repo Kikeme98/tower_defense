@@ -14,7 +14,9 @@ abrir una ventana.
 | Terreno renderizado (MultiMesh por regiones) | ✅ se ve |
 | Balance y curva de dificultad | ✅ portado |
 | Enemigos: daño en tres capas y venenos | ✅ portado y verificado |
-| Torres, oleadas, cartas | ⬜ pendiente |
+| Catálogo de torres y estadísticas | ✅ portado y verificado |
+| Director de oleadas | ✅ portado y verificado |
+| Cartas y draft | ⬜ pendiente |
 | Interfaz | ⬜ pendiente |
 | Agua, partículas, modelos | ⬜ pendiente |
 
@@ -26,6 +28,7 @@ GODOT=/Applications/Godot.app/Contents/MacOS/Godot
 # Lógica, sin ventana (equivalente a test.mjs)
 $GODOT --headless --script tests/test_mapgen.gd   # generación del mapa
 $GODOT --headless --script tests/test_combat.gd   # daño en tres capas y balance
+$GODOT --headless --script tests/test_towers.gd   # torres, terreno y oleadas
 
 # Ver el mapa: renderiza y guarda shot.png
 $GODOT --quit-after 300 res://scenes/main.tscn -- --shot --sectors=4
@@ -45,6 +48,9 @@ Tres diferencias de GDScript que costaron tiempo y conviene recordar:
   la clase esté registrada. En los tests hay que usar `preload`.
 - **Los errores despistan.** Un fallo de parseo en un archivo aparece como
   *"Nonexistent function 'new'"* en el que lo usa, no donde está el error real.
+- **Los lambda capturan las locales por valor**, no por referencia como en
+  JavaScript. Un contador acumulado dentro de un `func()` no se ve fuera: hay
+  que meterlo en un array o en una propiedad.
 
 Y dos del motor:
 
