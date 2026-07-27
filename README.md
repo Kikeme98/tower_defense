@@ -6,10 +6,16 @@ Tower defense roguelike en Three.js, con mapa generado proceduralmente que
 ```bash
 npm install
 npm run dev        # http://localhost:5173
-npm run build
+npm run build      # genera dist/
+npm run preview    # sirve el build local
 ```
 
 `?seed=loquesea` en la URL reproduce exactamente la misma partida.
+
+## Despliegue
+
+Es un sitio estático sin backend. En Vercel no hace falta configurar nada:
+detecta Vite y usa `npm run build` con `dist/` como salida.
 
 ## Cómo se juega
 
@@ -132,3 +138,7 @@ alcanzada, qué enemigos se colaron y el coste por frame.
 
 `spire` está expuesto en `window`: `spire.game`, `spire.loop.timeScale = 4`,
 `spire.BALANCE`, `spire.game.state.gold = 9999`.
+
+## Licencia
+
+MIT — ver [LICENSE](LICENSE).
