@@ -20,6 +20,7 @@ visual: interfaz, modelos y efectos.
 | Catálogo de torres y estadísticas | ✅ portado y verificado |
 | Director de oleadas | ✅ portado y verificado |
 | Cartas y draft | ✅ portado y verificado |
+| Escena con oleada en marcha | ✅ enemigos recorriendo el camino |
 | Interfaz | ⬜ pendiente |
 | Agua, partículas, modelos | ⬜ pendiente |
 
