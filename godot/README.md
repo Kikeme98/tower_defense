@@ -12,7 +12,9 @@ abrir una ventana.
 | Rejilla y catálogo de terrenos | ✅ portado |
 | Generación procedural del mapa | ✅ portado y verificado |
 | Terreno renderizado (MultiMesh por regiones) | ✅ se ve |
-| Torres, enemigos, oleadas, cartas | ⬜ pendiente |
+| Balance y curva de dificultad | ✅ portado |
+| Enemigos: daño en tres capas y venenos | ✅ portado y verificado |
+| Torres, oleadas, cartas | ⬜ pendiente |
 | Interfaz | ⬜ pendiente |
 | Agua, partículas, modelos | ⬜ pendiente |
 
@@ -22,7 +24,8 @@ abrir una ventana.
 GODOT=/Applications/Godot.app/Contents/MacOS/Godot
 
 # Lógica, sin ventana (equivalente a test.mjs)
-$GODOT --headless --script tests/test_mapgen.gd
+$GODOT --headless --script tests/test_mapgen.gd   # generación del mapa
+$GODOT --headless --script tests/test_combat.gd   # daño en tres capas y balance
 
 # Ver el mapa: renderiza y guarda shot.png
 $GODOT --quit-after 300 res://scenes/main.tscn -- --shot --sectors=4
