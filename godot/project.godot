@@ -1,0 +1,33 @@
+; Rogue Spire — versión Godot 4
+;
+; Migración del juego web. Se porta primero la lógica pura (rejilla, generación
+; procedural, balance), que es lo que no depende del motor y por tanto lo que
+; se puede verificar sin abrir una ventana.
+
+config_version=5
+
+[application]
+
+run/main_scene="res://scenes/main.tscn"
+
+config/name="Rogue Spire"
+config/description="Tower defense roguelike con mapa procedural que crece cada sector."
+config/features=PackedStringArray("4.3", "GL Compatibility")
+config/icon="res://icon.svg"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=900
+window/stretch/mode="canvas_items"
+
+[rendering]
+
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/vram_compression/import_etc2_astc=true
+anti_aliasing/quality/msaa_3d=1
+
+[physics]
+
+common/physics_ticks_per_second=60
