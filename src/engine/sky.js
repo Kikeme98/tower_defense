@@ -196,15 +196,26 @@ export class Sky {
     };
   }
 
+  /**
+   * El mapa de entorno se genera **una sola vez**, al arrancar.
+   *
+   * `PMREMGenerator.fromScene` cuesta unos 430 ms: renderiza la escena en las
+   * seis caras de un cubo y luego prefiltra. Regenerarlo al cambiar de paleta
+   * clavaba medio segundo de congelación en cada cambio de sector, y hacerlo
+   * durante la transición hundía el juego a 20 fps durante tres segundos.
+   *
+   * Sólo aporta reflejo especular en los materiales metálicos. El color
+   * ambiental de cada paleta lo lleva la luz hemisférica, que sí se interpola
+   * frame a frame y es gratis, así que la diferencia visual es inapreciable
+   * frente al tirón que evita.
+   */
   update(dt, time) {
     this.uniforms.uTime.value = time;
     if (this.mix < 1) {
       this.mix = Math.min(1, this.mix + dt * 0.35);
       this._apply(this.from, this.to, this.mix);
-      this._envDirty = true;
     } else if (!this.blend) {
       this._apply(this.to, this.to, 1);
-      this._envDirty = true;
     }
   }
 

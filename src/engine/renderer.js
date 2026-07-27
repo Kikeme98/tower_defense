@@ -179,6 +179,7 @@ export class Renderer {
   update(dt, time) {
     this.sky.update(dt, time);
     this.applyPalette();
+    // El mapa de entorno se genera una única vez: ver la explicación en Sky.update.
     if (this.sky.needsEnvRefresh) this.sky.refreshEnvironment();
     this.sky.follow(this.camera);
   }

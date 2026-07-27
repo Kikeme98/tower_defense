@@ -4,11 +4,56 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Rogue Spire — tower defense roguelike</title>
+  <meta name="description" content="Tower defense roguelike con mapa procedural que crece cada sector." />
   <link rel="stylesheet" href="/src/ui/styles.css" />
+  <!--
+    Pantalla de carga en el propio HTML, con estilos en línea: aparece con el
+    primer byte, antes de que llegue el JavaScript. Sin ella la pestaña se queda
+    en blanco durante toda la descarga y, sobre todo, durante el medio segundo
+    largo que WebGL tarda en compilar los shaders, que en un equipo modesto son
+    varios segundos con pinta de cuelgue.
+  -->
+  <style>
+    #boot {
+      position: fixed; inset: 0; z-index: 100; display: flex;
+      flex-direction: column; align-items: center; justify-content: center; gap: 22px;
+      background: radial-gradient(ellipse at 50% 40%, #16203a 0%, #0a0d16 70%);
+      color: #eef2f8; font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, sans-serif;
+      transition: opacity .45s ease;
+    }
+    #boot.done { opacity: 0; pointer-events: none; }
+    #boot h1 {
+      margin: 0; font-size: 42px; font-weight: 750; letter-spacing: -.02em;
+      background: linear-gradient(180deg, #cfe8ff, #6fb6e8);
+      -webkit-background-clip: text; background-clip: text; color: transparent;
+    }
+    #boot .sub { color: #9aa7bd; font-size: 15px; margin-top: -14px; }
+    #boot .bar {
+      width: min(320px, 70vw); height: 5px; border-radius: 3px;
+      background: rgba(255, 255, 255, .1); overflow: hidden;
+    }
+    #boot .bar i {
+      display: block; height: 100%; width: 8%; border-radius: 3px;
+      background: linear-gradient(90deg, #4aa8e0, #7dd8ff);
+      transition: width .3s ease;
+    }
+    #boot .step { color: #7d8ba3; font-size: 14px; min-height: 1.4em; }
+    @media (prefers-reduced-motion: reduce) {
+      #boot, #boot .bar i { transition: none; }
+    }
+  </style>
 </head>
 <body>
   <canvas id="viewport"></canvas>
   <div id="ui"></div>
+
+  <div id="boot">
+    <h1>Rogue Spire</h1>
+    <div class="sub">Tower defense roguelike</div>
+    <div class="bar"><i id="boot-bar"></i></div>
+    <div class="step" id="boot-step">Cargando…</div>
+  </div>
+
   <script type="module" src="/src/main.js"></script>
 </body>
 </html>
