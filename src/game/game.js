@@ -468,7 +468,7 @@ export class Game {
     this.enemies.render(this.rig.yaw);
     this.projectiles.render();
     this.fx.render();
-    this.r.followShadow(this.rig.target);
+    this.r.followShadow(this.rig.target, this.rig.dist);
     this.r.render();
   }
 }

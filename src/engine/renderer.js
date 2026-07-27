@@ -192,8 +192,14 @@ export class Renderer {
     this.camera.updateProjectionMatrix();
   }
 
-  /** Mantiene la sombra centrada en lo que mira el jugador. */
-  followShadow(target) {
+  /**
+   * Mantiene la sombra centrada en lo que mira el jugador y ajusta su alcance
+   * al zoom. Con un área fija y grande, de cerca se desperdiciaba casi toda la
+   * resolución del mapa de sombras en terreno que no se ve, y además entraba en
+   * él geometría de todo el mapa. El tamaño se redondea a saltos porque si
+   * siguiera al zoom de forma continua las sombras temblarían al acercarse.
+   */
+  followShadow(target, camDist = 46) {
     const d = this._sunDir || { x: 0.4, y: 0.5, z: 0.3 };
     this.sun.target.position.copy(target);
     this.sun.position.set(
@@ -203,6 +209,14 @@ export class Renderer {
     );
     this.fill.target = this.sun.target;
     this.fill.position.set(target.x - d.x * 90, target.y + 45, target.z - d.z * 90);
+
+    const want = Math.min(90, Math.max(22, Math.round(camDist * 0.85 / 16) * 16));
+    if (want !== this._shadowSpan) {
+      this._shadowSpan = want;
+      const c = this.sun.shadow.camera;
+      c.left = -want; c.right = want; c.top = want; c.bottom = -want;
+      c.updateProjectionMatrix();
+    }
   }
 
   render() {

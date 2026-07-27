@@ -6,12 +6,19 @@ import * as THREE from 'three';
  * lo que permite miles de enemigos/proyectiles sin coste de CPU apreciable.
  */
 export class InstancedBatch {
-  constructor(geometry, material, capacity = 256, { shadows = true, colors = true } = {}) {
+  /**
+   * `culled` activa el descarte por frustum. Sólo tiene sentido en lotes cuyo
+   * contenido es estático (el terreno, la vegetación): para eso hay que
+   * recalcular la esfera envolvente al llenarlos, lo que sería un desperdicio
+   * en lotes que se reescriben enteros cada frame.
+   */
+  constructor(geometry, material, capacity = 256, { shadows = true, colors = true, culled = false } = {}) {
     this.geometry = geometry;
     this.material = material;
     this.capacity = capacity;
     this.useColors = colors;
     this.shadows = shadows;
+    this.culled = culled;
     this.n = 0;
     this._build(capacity);
   }
@@ -22,7 +29,10 @@ export class InstancedBatch {
     mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
     mesh.castShadow = this.shadows;
     mesh.receiveShadow = this.shadows;
-    mesh.frustumCulled = false; // el contenido cambia cada frame; el culling daría falsos negativos
+    // En los lotes dinámicos el contenido cambia cada frame y el culling daría
+    // falsos negativos; en los estáticos es justo lo que evita dibujar el mapa
+    // entero cuando sólo se ve un trozo.
+    mesh.frustumCulled = this.culled;
     if (this.useColors) {
       mesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(capacity * 3), 3);
       mesh.instanceColor.setUsage(THREE.DynamicDrawUsage);
@@ -88,6 +98,12 @@ export class InstancedBatch {
     this.mesh.count = this.n;
     this.mesh.instanceMatrix.needsUpdate = true;
     if (this.mesh.instanceColor) this.mesh.instanceColor.needsUpdate = true;
+    // La esfera envolvente sólo se recalcula en lotes estáticos, que se llenan
+    // de uvas a peras. Three la necesita para decidir si el lote entra en cámara.
+    if (this.culled) {
+      if (this.n > 0) this.mesh.computeBoundingSphere();
+      else this.mesh.boundingSphere = null;
+    }
   }
 
   dispose() {

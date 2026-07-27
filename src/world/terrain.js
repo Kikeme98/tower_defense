@@ -129,27 +129,43 @@ function grassGeometry() {
  * Vista del terreno. Todo el mapa —decenas de miles de casillas— cabe en unos
  * pocos draw calls porque cada tipo de pieza es un único lote instanciado.
  */
+/** Lado en casillas de cada región. Ver el comentario de TerrainView. */
+const CHUNK = 12;
+
 export class TerrainView {
+  /**
+   * El mapa se reparte en regiones cuadradas, cada una con sus propios lotes
+   * instanciados. Así Three descarta de golpe las que quedan fuera de cámara,
+   * en vez de mandar a dibujar las miles de casillas del mapa entero mires
+   * donde mires. El tamaño es un compromiso: regiones pequeñas descartan mejor
+   * pero multiplican las llamadas de dibujo.
+   */
   constructor(scene) {
     this.scene = scene;
     this.lastVersion = -1;
+    this.chunks = new Map();
 
     const tex = surfaceTexture();
-    const solidMat = new THREE.MeshStandardMaterial({
-      vertexColors: true, map: tex, roughness: 0.92, metalness: 0.0,
-    });
-    this.solid = new InstancedBatch(shadedBox(), solidMat, 8192).addTo(scene);
+    this.mat = {
+      solid: new THREE.MeshStandardMaterial({
+        vertexColors: true, map: tex, roughness: 0.92, metalness: 0.0,
+      }),
+      flora: new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 }),
+      floraFlat: new THREE.MeshStandardMaterial({
+        vertexColors: true, roughness: 0.9, side: THREE.DoubleSide,
+      }),
+    };
+    // Las geometrías se comparten entre todas las regiones: sólo cambian las
+    // matrices de instancia.
+    this.geo = {
+      solid: shadedBox(),
+      conifer: coniferGeometry(),
+      broadleaf: broadleafGeometry(),
+      rocks: rockGeometry(),
+      grass: grassGeometry(),
+    };
 
     this.water = new Water(scene);
-
-    const flora = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 0.85 });
-    const floraFlat = new THREE.MeshStandardMaterial({
-      vertexColors: true, roughness: 0.9, side: THREE.DoubleSide,
-    });
-    this.conifer = new InstancedBatch(coniferGeometry(), flora, 4096).addTo(scene);
-    this.broadleaf = new InstancedBatch(broadleafGeometry(), flora, 4096).addTo(scene);
-    this.rocks = new InstancedBatch(rockGeometry(), flora, 2048).addTo(scene);
-    this.grass = new InstancedBatch(grassGeometry(), floraFlat, 4096, { shadows: false }).addTo(scene);
 
     const featMat = new THREE.MeshBasicMaterial({ vertexColors: true, toneMapped: false });
     this.veins = new InstancedBatch(
@@ -214,14 +230,37 @@ export class TerrainView {
     if (changed) this.lastVersion = -1; // fuerza reconstrucción con la nueva densidad
   }
 
+  /** Crea (o recupera) los lotes de la región que contiene una casilla. */
+  _chunkAt(cx, cz) {
+    const key = ((cx + 512) << 10) | (cz + 512);
+    let c = this.chunks.get(key);
+    if (!c) {
+      const opt = { culled: true };
+      c = {
+        solid: new InstancedBatch(this.geo.solid, this.mat.solid, 320, opt).addTo(this.scene),
+        conifer: new InstancedBatch(this.geo.conifer, this.mat.flora, 192, opt).addTo(this.scene),
+        broadleaf: new InstancedBatch(this.geo.broadleaf, this.mat.flora, 192, opt).addTo(this.scene),
+        rocks: new InstancedBatch(this.geo.rocks, this.mat.flora, 192, opt).addTo(this.scene),
+        grass: new InstancedBatch(this.geo.grass, this.mat.floraFlat, 256,
+          { culled: true, shadows: false }).addTo(this.scene),
+      };
+      this.chunks.set(key, c);
+    }
+    return c;
+  }
+
   /** Reconstruye los buffers a partir del estado de la rejilla. */
   rebuild(grid) {
     if (grid.version === this.lastVersion) return;
     this.lastVersion = grid.version;
     const density = this._preset ? this._preset.decoDensity : 1;
 
-    const { solid, conifer, broadleaf, rocks, grass } = this;
-    for (const b of [solid, conifer, broadleaf, rocks, grass]) b.begin();
+    // Todas las regiones se vacían y se vuelven a llenar: al expandir el mapa
+    // cambian las casillas de los bordes de varias a la vez.
+    for (const c of this.chunks.values()) {
+      c.solid.begin(); c.conifer.begin(); c.broadleaf.begin();
+      c.rocks.begin(); c.grass.begin();
+    }
     this._waterCells.length = 0;
     this._featureCells.length = 0;
 
@@ -229,6 +268,11 @@ export class TerrainView {
     const size = TILE * 0.985;
 
     for (const cell of grid.cells.values()) {
+      // Cada casilla va al lote de su región; el resto del bucle no cambia.
+      const ch = this._chunkAt(Math.floor(cell.x / CHUNK), Math.floor(cell.y / CHUNK));
+      const solid = ch.solid, conifer = ch.conifer, broadleaf = ch.broadleaf;
+      const rocks = ch.rocks, grass = ch.grass;
+
       const def = TERRAIN[cell.terrain];
       const y = cell.wy;
       const depth = y + 6; // los bloques bajan hasta una base común: no se ve el vacío
@@ -286,7 +330,10 @@ export class TerrainView {
       }
     }
 
-    for (const b of [solid, conifer, broadleaf, rocks, grass]) b.end();
+    for (const c2 of this.chunks.values()) {
+      c2.solid.end(); c2.conifer.end(); c2.broadleaf.end();
+      c2.rocks.end(); c2.grass.end();
+    }
     this.water.build(grid, this._waterCells);
   }
 
