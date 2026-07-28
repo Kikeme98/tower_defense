@@ -8,6 +8,7 @@ extends Node3D
 
 const RunScript = preload("res://scripts/game/run.gd")
 const TerrainViewScript = preload("res://scripts/world/terrain_view.gd")
+const WaterViewScript = preload("res://scripts/world/water_view.gd")
 const EnemyViewScript = preload("res://scripts/enemy_view.gd")
 const BattleViewScript = preload("res://scripts/battle_view.gd")
 const TowerDefsScript = preload("res://scripts/game/tower_defs.gd")
@@ -20,6 +21,7 @@ const FXViewScript = preload("res://scripts/fx_view.gd")
 
 var run
 var terrain: Node3D
+var water
 var enemy_view
 var health_bars
 var fx_view
@@ -49,6 +51,8 @@ func _ready() -> void:
 
 	terrain = TerrainViewScript.new()
 	add_child(terrain)
+	water = WaterViewScript.new()
+	add_child(water)
 	enemy_view = EnemyViewScript.new()
 	add_child(enemy_view)
 	health_bars = HealthBarsScript.new()
@@ -234,6 +238,7 @@ func _process(_delta: float) -> void:
 	if run.grid.version != _map_version:
 		_map_version = run.grid.version
 		terrain.build(run.grid)
+		water.build(run.grid)
 		markers.sync(run.map)
 		rig.frame(run.grid)
 

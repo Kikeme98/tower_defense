@@ -96,6 +96,11 @@ func build(grid: Grid) -> void:
 			var col: Color = (def["top"] as Color).srgb_to_linear()
 			# Variación por casilla y ligera pérdida de color con la altura.
 			var tint: float = c.tint * (1.0 - float(maxi(0, c.height)) * 0.012)
+			# Las casillas de agua son el fondo del lago, no el agua: la lámina
+			# va encima y es translúcida. Oscurecerlas es lo que da sensación de
+			# profundidad en vez de una tapa azul sobre otra.
+			if c.terrain == Grid.T.WATER:
+				tint *= 0.45
 			col = Color(col.r * tint, col.g * tint, col.b * tint, 1.0)
 			mm.set_instance_color(i, col)
 
