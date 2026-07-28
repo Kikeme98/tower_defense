@@ -56,6 +56,16 @@ func frame(grid) -> void:
 	_apply()
 
 
+## Salta a un punto concreto, sin suavizado. Para capturas de comprobación y
+## para centrar el núcleo cuando lo alcanzan.
+func focus(at: Vector3, distance: float) -> void:
+	target = at
+	_target_want = at
+	dist = distance
+	_dist_want = distance
+	_apply()
+
+
 func _unhandled_input(event: InputEvent) -> void:
 	if event is InputEventMouseButton:
 		match event.button_index:

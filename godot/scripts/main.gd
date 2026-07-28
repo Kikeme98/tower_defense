@@ -83,6 +83,11 @@ func _ready() -> void:
 	# mapa vacío no dice si el juego funciona.
 	if "--shot" in args:
 		_seed_defense()
+		# `--wave=N` salta a una oleada concreta: las primeras traen cuatro
+		# enemigos y se acaban antes de que dé tiempo a fotografiar nada.
+		for a in args:
+			if a.begins_with("--wave="):
+				run.state["wave"] = int(a.substr(7)) - 1
 		run.start_wave()
 
 	print("mapa: %d casillas · %d rutas · sector %d · %d torres"
@@ -252,6 +257,15 @@ func _maybe_shot() -> void:
 	print("oleada %d · %d enemigos · %d disparos · %d de oro · %d vidas"
 		% [run.state["wave"], run.battle.enemies.size(), run.battle.projectiles.size(),
 			run.gold, run.lives])
+	# Con `--close` la cámara baja hasta el enemigo más avanzado. A la distancia
+	# de juego un enemigo ocupa diez píxeles, y en una captura así es imposible
+	# saber si el modelo está bien o si le falta media pieza.
+	if "--close" in OS.get_cmdline_user_args() and not run.battle.enemies.is_empty():
+		var best = run.battle.enemies[0]
+		for e in run.battle.enemies:
+			if e.progress > best.progress:
+				best = e
+		rig.focus(Vector3(best.x, best.y, best.z), 14.0)
 	# Una señal de un solo disparo en vez de `await`: la corrutina se quedaba
 	# suspendida sin reanudarse en algunas ejecuciones, y la captura no salía.
 	RenderingServer.frame_post_draw.connect(_save_shot, CONNECT_ONE_SHOT)

@@ -41,7 +41,7 @@ func _ready() -> void:
 	glow.albedo_color = Color8(0x8a, 0xd8, 0xff)
 	glow.emission_enabled = true
 	glow.emission = Color8(0x6a, 0xc8, 0xff)
-	glow.emission_energy_multiplier = 2.6
+	glow.emission_energy_multiplier = 1.25
 	var oct := SphereMesh.new()
 	oct.radius = 0.85
 	oct.height = 2.6
@@ -69,7 +69,7 @@ func _ready() -> void:
 
 	var light := OmniLight3D.new()
 	light.light_color = Color8(0x8a, 0xd8, 0xff)
-	light.light_energy = 2.2
+	light.light_energy = 1.4
 	light.omni_range = 14.0
 	light.position.y = 4.4
 	_core.add_child(light)
@@ -88,7 +88,7 @@ func sync(map) -> void:
 	mat.albedo_color = Color8(0xff, 0x5a, 0x8a)
 	mat.emission_enabled = true
 	mat.emission = Color8(0xff, 0x3a, 0x7a)
-	mat.emission_energy_multiplier = 2.4
+	mat.emission_energy_multiplier = 1.1
 	var torus := TorusMesh.new()
 	torus.inner_radius = 1.0
 	torus.outer_radius = 1.3
