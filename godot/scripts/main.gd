@@ -15,10 +15,14 @@ const GridScript = preload("res://scripts/world/grid.gd")
 const CameraRigScript = preload("res://scripts/camera_rig.gd")
 const MarkersViewScript = preload("res://scripts/markers_view.gd")
 const HUDScript = preload("res://scripts/ui/hud.gd")
+const HealthBarsScript = preload("res://scripts/health_bars.gd")
+const FXViewScript = preload("res://scripts/fx_view.gd")
 
 var run
 var terrain: Node3D
 var enemy_view
+var health_bars
+var fx_view
 var battle_view
 var markers
 var rig
@@ -36,6 +40,8 @@ func _ready() -> void:
 			seed_text = a.substr(7)
 		elif a.begins_with("--sectors="):
 			sectors = int(a.substr(10))
+		elif a.begins_with("--shot-at="):
+			_shot_at = int(a.substr(10))
 
 	run = RunScript.new(seed_text)
 	for i in sectors:
@@ -45,6 +51,10 @@ func _ready() -> void:
 	add_child(terrain)
 	enemy_view = EnemyViewScript.new()
 	add_child(enemy_view)
+	health_bars = HealthBarsScript.new()
+	add_child(health_bars)
+	fx_view = FXViewScript.new()
+	add_child(fx_view)
 	battle_view = BattleViewScript.new()
 	add_child(battle_view)
 	markers = MarkersViewScript.new()
@@ -207,6 +217,10 @@ func _update_hover() -> void:
 
 func _physics_process(delta: float) -> void:
 	run.update(delta)
+	# Los efectos se recogen aquí y no al dibujar: el campo de batalla vacía su
+	# lista en cada paso de simulación, y si la física corre dos veces entre dos
+	# frames, los impactos del primer paso se perderían.
+	fx_view.consume(run.battle)
 
 
 func _process(_delta: float) -> void:
@@ -220,6 +234,7 @@ func _process(_delta: float) -> void:
 
 	_update_hover()
 	enemy_view.draw_enemies(run.battle.enemies)
+	health_bars.draw(run.battle.enemies)
 	battle_view.draw(run.battle, hover_cell, hud.selected_def, hud.selected_tower, run)
 	_maybe_shot()
 
@@ -228,9 +243,10 @@ func _maybe_shot() -> void:
 	if _shot_done or not "--shot" in OS.get_cmdline_user_args():
 		return
 	_shot_frames += 1
-	# Se deja avanzar la oleada para que los enemigos salgan de los portales y
-	# entren en el alcance de las torres: una foto del primer frame no diría nada.
-	if _shot_frames < 260:
+	# Se deja avanzar la oleada para que los enemigos recorran el camino y
+	# entren en el alcance de las torres: una foto del primer frame no diría
+	# nada de si el combate funciona.
+	if _shot_frames < _shot_at:
 		return
 	_shot_done = true
 	print("oleada %d · %d enemigos · %d disparos · %d de oro · %d vidas"
@@ -247,4 +263,5 @@ func _save_shot() -> void:
 	get_tree().quit()
 
 var _shot_frames := 0
+var _shot_at := 900
 var _shot_done := false

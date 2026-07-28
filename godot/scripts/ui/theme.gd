@@ -40,11 +40,23 @@ const DANGER := Color8(0xff, 0x6b, 0x7a)
 const OK := Color8(0x7a, 0xe0, 0x9a)
 const FOCUS := Color8(0x8a, 0xd8, 0xff)
 
-## Símbolos de las tres capas de daño. Se usan en todas partes —enemigos,
-## cartas, panel de torre— para que un icono signifique siempre lo mismo.
-const SYM_HEALTH := "♥"
-const SYM_ARMOR := "▣"
-const SYM_SHIELD := "◈"
+## Etiquetas de las tres capas de daño. Se usan en todas partes —panel de torre,
+## cartas, avisos— para que cada capa se nombre siempre igual.
+##
+## Son texto y no iconos por un motivo concreto: la fuente que Godot incrusta
+## (Open Sans) no trae ni un solo símbolo de los que pedían estos indicadores.
+## En macOS se ven porque el motor recurre a las fuentes del sistema, pero en un
+## ejecutable en Windows o Linux saldrían como cuadros vacíos, y justamente
+## estos indicadores existen para no depender del color. Un símbolo que a veces
+## no se dibuja es peor que una palabra que siempre se lee.
+const SYM_HEALTH := "VIDA"
+const SYM_ARMOR := "ARMA"
+const SYM_SHIELD := "ESC"
+const SYM_GOLD := "Oro"
+
+## Caracteres seguros: los únicos adornos que Open Sans garantiza.
+const BULLET := "•"
+const TIMES := "×"
 
 
 static func panel_style(bg := BG, radius := 10) -> StyleBoxFlat:

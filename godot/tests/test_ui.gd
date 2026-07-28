@@ -12,6 +12,7 @@ const HUDScript = preload("res://scripts/ui/hud.gd")
 const RunScript = preload("res://scripts/game/run.gd")
 const UI = preload("res://scripts/ui/theme.gd")
 const TowerDefsScript = preload("res://scripts/game/tower_defs.gd")
+const CardsScript = preload("res://scripts/game/cards.gd")
 
 var checks := 0
 var failures := 0
@@ -39,6 +40,7 @@ func _init() -> void:
 	_check_safe_area(hud)
 	_check_no_color_only(hud, run)
 	_check_states(hud, run)
+	_check_glyphs(hud)
 
 	if failures == 0:
 		print("✓ %d comprobaciones correctas" % checks)
@@ -157,13 +159,59 @@ func _check_states(hud, run) -> void:
 			detail += c.text + "\n"
 	for sym in [UI.SYM_HEALTH, UI.SYM_ARMOR, UI.SYM_SHIELD]:
 		ok(sym in detail,
-			"el panel de la torre no muestra el símbolo «%s» de una de las capas" % sym)
+			"el panel de la torre no muestra la etiqueta «%s» de una de las capas" % sym)
+	# Con el panel abierto, para que la comprobación de glifos alcance su texto.
+	_check_glyphs(hud)
+
+	# Draft: se fuerza una mano de cartas y se comprueba que se dibuja entera.
+	run.cards = CardsScript.draw(run._card_rng, run.catalog, run.state, 3, false)
+	run.phase = RunScript.Phase.DRAFT
+	hud.refresh()
+	ok(not run.cards.is_empty(), "el draft no ofreció ninguna carta")
+	_check_glyphs(hud)
+	run.phase = RunScript.Phase.BUILD
+	run.cards.clear()
+	hud.refresh()
 
 	# Y tras vender, el panel desaparece en vez de quedarse con datos muertos.
 	run.sell(cell.tower)
 	hud.selected_tower = null
 	hud.refresh()
 	ok(true, "el HUD sobrevive a vender la torre seleccionada")
+
+
+## Todo el texto del HUD tiene que poder dibujarse con la fuente que Godot
+## incrusta, sin depender de las del sistema.
+##
+## Es una trampa fácil de pisar: en macOS el motor recurre a las fuentes del
+## sistema y símbolos como ♥, ⬢ o ⚔ se ven perfectos, así que uno los usa y da
+## por hecho que funcionan. En un ejecutable de Windows o Linux esos mismos
+## caracteres salen como cuadros vacíos. Y como parte de la interfaz usa
+## símbolos precisamente para no depender del color, perderlos deja el HUD
+## dependiendo de lo único que se quería evitar.
+func _check_glyphs(hud) -> void:
+	var font: Font = ThemeDB.fallback_font
+	ok(font != null, "no hay fuente de reserva con la que comprobar los glifos")
+	if font == null:
+		return
+
+	var missing := {}
+	for c in _walk(hud, []):
+		var text := ""
+		if c is Label or c is Button:
+			text = c.text
+		if c is Button and c.tooltip_text != "":
+			text += c.tooltip_text
+		for i in text.length():
+			var cp: int = text.unicode_at(i)
+			# Los espacios, saltos y tabuladores no tienen glifo propio.
+			if cp <= 32:
+				continue
+			if not font.has_char(cp):
+				missing[text[i]] = true
+
+	ok(missing.is_empty(),
+		"la fuente incrustada no puede dibujar: %s" % " ".join(missing.keys()))
 
 
 func _name_of(c: Control) -> String:

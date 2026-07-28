@@ -110,9 +110,9 @@ func _build_resources(root: Control) -> void:
 	box.add_theme_constant_override("separation", int(UI.GAP * 0.5))
 	p.add_child(box)
 
-	# El símbolo va siempre delante de la cifra: identifica el recurso sin
-	# depender del color ni de recordar el orden.
-	_gold = UI.label("⬢ 0", UI.FONT_STRONG, UI.GOLD)
+	# El nombre del recurso va siempre delante de la cifra: identifica qué es
+	# sin depender del color ni de recordar el orden de los indicadores.
+	_gold = UI.label("%s 0" % UI.SYM_GOLD, UI.FONT_STRONG, UI.GOLD)
 	box.add_child(_gold)
 
 	var lives_row := HBoxContainer.new()
@@ -145,7 +145,7 @@ func _build_wave_panel(root: Control) -> void:
 	_enemies.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
 	box.add_child(_enemies)
 
-	_wave_button = UI.button("▶  Lanzar oleada", UI.OK)
+	_wave_button = UI.button("Lanzar oleada", UI.OK)
 	_wave_button.pressed.connect(func(): wave_requested.emit())
 	box.add_child(_wave_button)
 
@@ -298,7 +298,7 @@ func _on_changed(what: String) -> void:
 
 ## Las cifras que cambian solas: oro y vidas.
 func _refresh_readouts() -> void:
-	_gold.text = "⬢ %d" % run.gold
+	_gold.text = "%s %d" % [UI.SYM_GOLD, run.gold]
 	var max_lives: int = int(run.state["max_lives"])
 	_lives.text = "%s %d / %d" % [UI.SYM_HEALTH, run.lives, max_lives]
 	var frac: float = float(run.lives) / maxf(1.0, float(max_lives))
@@ -328,10 +328,10 @@ func _refresh_wave_line() -> void:
 	if in_combat:
 		var left: int = run.battle.enemies.size() + run.director.remaining
 		_enemies.text = "%d enemigos en el mapa" % left
-		_wave_button.text = "⏳  En combate"
+		_wave_button.text = "En combate…"
 	else:
 		_enemies.text = ""
-		_wave_button.text = "▶  Lanzar oleada %d" % (int(run.state["wave"]) + 1)
+		_wave_button.text = "Lanzar oleada %d" % (int(run.state["wave"]) + 1)
 
 
 func _refresh_shop() -> void:
@@ -346,7 +346,7 @@ func _refresh_shop() -> void:
 		var affordable: bool = run.gold >= cost
 		# El precio se muestra siempre; si no llega, además se desactiva. Dos
 		# señales para el mismo hecho, y ninguna depende sólo del color.
-		b2.text = "%s\n⬢ %d" % [def["name"], cost]
+		b2.text = "%s\n%s %d" % [def["name"], UI.SYM_GOLD, cost]
 		b2.disabled = not affordable
 		var picked: bool = not selected_def.is_empty() and selected_def["id"] == id
 		b2.add_theme_color_override("font_color",
@@ -392,13 +392,13 @@ func _refresh_detail() -> void:
 			b.text = "%s · al máximo" % path["name"]
 			b.disabled = true
 		else:
-			b.text = "%s %d  ⬢ %d" % [path["name"], t.levels[pid], cost]
+			b.text = "%s %d   %s %d" % [path["name"], t.levels[pid], UI.SYM_GOLD, cost]
 			b.disabled = run.gold < cost
 			b.pressed.connect(func(): upgrade_requested.emit(pid))
 		_detail_body.add_child(b)
 
-	var sell := UI.button("Vender  ⬢ %d" % int(round(float(t.invested) * Balance.SELL_RATIO)),
-		UI.DANGER)
+	var sell := UI.button("Vender   %s %d"
+		% [UI.SYM_GOLD, int(round(float(t.invested) * Balance.SELL_RATIO))], UI.DANGER)
 	sell.pressed.connect(func(): sell_requested.emit())
 	_detail_body.add_child(sell)
 
@@ -428,9 +428,12 @@ func _card_button(card: Dictionary) -> Button:
 	b.custom_minimum_size = Vector2(230, 160)
 	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	# La rareza va escrita, no sólo en el color del borde: es lo que distingue
-	# un pacto (que empeora algo) de una mejora limpia.
-	b.text = "%s  %s\n%s\n\n%s" % [
-		card["icon"], card["name"],
+	# un pacto (que empeora algo a cambio de potencia) de una mejora limpia.
+	# El icono de la carta no se pinta: la fuente incrustada no trae ninguno de
+	# los símbolos del catálogo, y un glifo que sólo aparece en unas plataformas
+	# es peor que no ponerlo.
+	b.text = "%s\n%s\n\n%s" % [
+		card["name"],
 		Cards.RARITY[rarity]["name"].to_upper(),
 		card["desc"]]
 	b.pressed.connect(func(): card_chosen.emit(card))
