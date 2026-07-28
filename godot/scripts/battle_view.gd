@@ -14,6 +14,9 @@ extends Node3D
 var _bases: MultiMeshInstance3D
 var _heads: MultiMeshInstance3D
 var _shots: MultiMeshInstance3D
+var _cursor: MeshInstance3D
+var _range: MeshInstance3D
+var _ghost: MeshInstance3D
 
 
 func _ready() -> void:
@@ -22,6 +25,46 @@ func _ready() -> void:
 	# Los proyectiles no proyectan sombra ni la reciben: son destellos, y
 	# calcularles sombra a cientos por segundo no aporta nada visible.
 	_shots = _make(SphereMesh.new(), true)
+	_build_cursor()
+
+
+## Cursor, anillo de alcance y torre fantasma. Son tres nodos sueltos porque
+## nunca hay más de uno de cada: meterlos en el MultiMesh sólo complicaría.
+func _build_cursor() -> void:
+	var flat := StandardMaterial3D.new()
+	flat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	flat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	flat.albedo_color = Color(1, 1, 1, 0.35)
+	# Sin esto el cursor desaparece dentro del bloque sobre el que se dibuja.
+	flat.no_depth_test = true
+
+	var box := BoxMesh.new()
+	box.size = Vector3(Grid.TILE * 1.02, 0.12, Grid.TILE * 1.02)
+	_cursor = MeshInstance3D.new()
+	_cursor.mesh = box
+	_cursor.material_override = flat
+	_cursor.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_cursor.visible = false
+	add_child(_cursor)
+
+	var ring := TorusMesh.new()
+	ring.rings = 48
+	ring.ring_segments = 4
+	_range = MeshInstance3D.new()
+	_range.mesh = ring
+	_range.material_override = flat.duplicate()
+	_range.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_range.visible = false
+	add_child(_range)
+
+	var ghost := BoxMesh.new()
+	ghost.size = Vector3(1.0, 1.6, 1.0)
+	_ghost = MeshInstance3D.new()
+	_ghost.mesh = ghost
+	_ghost.material_override = flat.duplicate()
+	_ghost.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	_ghost.visible = false
+	add_child(_ghost)
 
 
 func _make(mesh: Mesh, unshaded: bool) -> MultiMeshInstance3D:
@@ -67,9 +110,69 @@ func _head_mesh() -> BoxMesh:
 	return b
 
 
-func draw(battle) -> void:
+func draw(battle, hover = null, picked_def := {}, picked_tower = null, run = null) -> void:
 	_draw_towers(battle)
 	_draw_shots(battle)
+	_draw_cursor(battle, hover, picked_def, picked_tower, run)
+
+
+## Verde si se puede construir ahí, rojo si no. El color va acompañado de la
+## forma: cuando no se puede, el fantasma de la torre no aparece, así que la
+## diferencia se ve aunque no se distingan los colores.
+func _draw_cursor(battle, hover, picked_def: Dictionary, picked_tower, run) -> void:
+	_cursor.visible = false
+	_range.visible = false
+	_ghost.visible = false
+
+	if picked_tower != null and picked_tower.cell != null:
+		# Torre seleccionada: se enseña su alcance real, con mejoras y terreno.
+		_show_range(Vector3(picked_tower.x, picked_tower.y, picked_tower.z),
+			picked_tower.stats["range"], Color(0.55, 0.85, 1.0, 0.30))
+		_place_cursor(picked_tower.cell, Color(0.55, 0.85, 1.0, 0.35))
+		return
+
+	if hover == null:
+		return
+
+	if picked_def.is_empty():
+		_place_cursor(hover, Color(1, 1, 1, 0.22))
+		return
+
+	var can: bool = battle.can_place(hover, picked_def)
+	var afford: bool = run == null or run.gold >= run.cost_of(picked_def)
+	var ok: bool = can and afford
+	_place_cursor(hover, Color(0.45, 1.0, 0.6, 0.38) if ok else Color(1.0, 0.35, 0.35, 0.38))
+	if not ok:
+		return
+
+	_ghost.visible = true
+	_ghost.position = Vector3(hover.wx, hover.wy + 0.8, hover.wz)
+	(_ghost.material_override as StandardMaterial3D).albedo_color = \
+		Color(picked_def["accent"], 0.45)
+
+	# Alcance previsto en esa casilla concreta: el terreno y la altura lo
+	# cambian, y es justo el dato que decide dónde merece la pena construir.
+	var terrain_mod: float = float(Grid.TERRAIN[hover.terrain]["mods"].get("range", 1.0))
+	var global_mod: float = 1.0 if run == null \
+		else float(run.state["global"].get("range", 1.0))
+	var r: float = float(picked_def["range"]) * terrain_mod * global_mod \
+		* (1.0 + float(maxi(0, hover.height)) * 0.045)
+	_show_range(Vector3(hover.wx, hover.wy, hover.wz), r, Color(0.45, 1.0, 0.6, 0.28))
+
+
+func _place_cursor(cell, color: Color) -> void:
+	_cursor.visible = true
+	_cursor.position = Vector3(cell.wx, cell.wy + 0.08, cell.wz)
+	(_cursor.material_override as StandardMaterial3D).albedo_color = color
+
+
+func _show_range(at: Vector3, radius: float, color: Color) -> void:
+	_range.visible = true
+	_range.position = at + Vector3(0, 0.14, 0)
+	var t := _range.mesh as TorusMesh
+	t.inner_radius = maxf(0.1, radius - 0.14)
+	t.outer_radius = radius
+	(_range.material_override as StandardMaterial3D).albedo_color = color
 
 
 func _draw_towers(battle) -> void:

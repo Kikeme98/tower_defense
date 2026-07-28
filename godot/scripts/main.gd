@@ -14,6 +14,7 @@ const TowerDefsScript = preload("res://scripts/game/tower_defs.gd")
 const GridScript = preload("res://scripts/world/grid.gd")
 const CameraRigScript = preload("res://scripts/camera_rig.gd")
 const MarkersViewScript = preload("res://scripts/markers_view.gd")
+const HUDScript = preload("res://scripts/ui/hud.gd")
 
 var run
 var terrain: Node3D
@@ -21,6 +22,8 @@ var enemy_view
 var battle_view
 var markers
 var rig
+var hud
+var hover_cell = null
 var _map_version := -1
 
 
@@ -53,6 +56,18 @@ func _ready() -> void:
 	run.changed.connect(func(what: String):
 		if what == "damage":
 			markers.hit())
+
+	hud = HUDScript.new()
+	add_child(hud)
+	hud.setup(run)
+	hud.build_requested.connect(_on_build_requested)
+	hud.wave_requested.connect(func(): run.start_wave())
+	hud.card_chosen.connect(func(card): run.choose_card(card))
+	hud.upgrade_requested.connect(func(path): run.upgrade(hud.selected_tower, path))
+	hud.sell_requested.connect(func():
+		run.sell(hud.selected_tower)
+		hud.selected_tower = null
+		hud.refresh())
 
 	# En modo captura se planta una defensa y se lanza una oleada: una foto del
 	# mapa vacío no dice si el juego funciona.
@@ -129,6 +144,67 @@ func _setup_world() -> void:
 	rig.frame(run.grid)
 
 
+## Selección de torre en la tienda. Volver a pulsar la misma la deselecciona:
+## sin eso, una vez elegida no hay forma de salir del modo construcción.
+func _on_build_requested(def: Dictionary) -> void:
+	if not hud.selected_def.is_empty() and hud.selected_def["id"] == def["id"]:
+		hud.selected_def = {}
+	else:
+		hud.selected_def = def
+		hud.selected_tower = null
+	hud.refresh()
+
+
+func _unhandled_input(event: InputEvent) -> void:
+	if not (event is InputEventMouseButton) or not event.pressed:
+		return
+	if event.button_index == MOUSE_BUTTON_RIGHT:
+		# Botón derecho: cancelar. Es lo que espera todo el mundo, y evita
+		# quedarse atrapado con una torre pegada al cursor.
+		hud.selected_def = {}
+		hud.selected_tower = null
+		hud.refresh()
+		return
+	if event.button_index != MOUSE_BUTTON_LEFT or hover_cell == null:
+		return
+
+	if not hud.selected_def.is_empty():
+		if run.place(hud.selected_def, hover_cell):
+			# Con Mayús pulsada la torre sigue seleccionada, para construir en
+			# serie sin volver a la tienda entre casilla y casilla.
+			if not Input.is_key_pressed(KEY_SHIFT):
+				hud.selected_def = {}
+		hud.refresh()
+		return
+
+	hud.selected_tower = hover_cell.tower
+	hud.refresh()
+
+
+## Casilla bajo el cursor, corrigiendo el desvío que provoca la altura.
+##
+## Un solo trazado contra el plano y = 0 falla varias casillas sobre una
+## montaña, porque la cámara mira en diagonal. Se traza primero contra el suelo,
+## se mira qué altura tiene ahí, y se vuelve a trazar a esa altura.
+func _update_hover() -> void:
+	if run.phase == run.Phase.DRAFT or run.phase == run.Phase.GAMEOVER:
+		hover_cell = null
+		return
+	var screen := get_viewport().get_mouse_position()
+	var p = rig.pick_ground(screen, 0.0)
+	if p == null:
+		hover_cell = null
+		return
+	var cell = run.grid.at_world(p.x, p.z)
+	if cell != null:
+		var p2 = rig.pick_ground(screen, cell.wy)
+		if p2 != null:
+			var better = run.grid.at_world(p2.x, p2.z)
+			if better != null:
+				cell = better
+	hover_cell = cell
+
+
 func _physics_process(delta: float) -> void:
 	run.update(delta)
 
@@ -142,8 +218,9 @@ func _process(_delta: float) -> void:
 		markers.sync(run.map)
 		rig.frame(run.grid)
 
+	_update_hover()
 	enemy_view.draw_enemies(run.battle.enemies)
-	battle_view.draw(run.battle)
+	battle_view.draw(run.battle, hover_cell, hud.selected_def, hud.selected_tower, run)
 	_maybe_shot()
 
 
@@ -155,13 +232,16 @@ func _maybe_shot() -> void:
 	# entren en el alcance de las torres: una foto del primer frame no diría nada.
 	if _shot_frames < 260:
 		return
-	# El await deja pasar un frame más, y sin la bandera la captura se guardaba
-	# dos veces antes de que llegase el quit.
 	_shot_done = true
 	print("oleada %d · %d enemigos · %d disparos · %d de oro · %d vidas"
 		% [run.state["wave"], run.battle.enemies.size(), run.battle.projectiles.size(),
 			run.gold, run.lives])
-	await RenderingServer.frame_post_draw
+	# Una señal de un solo disparo en vez de `await`: la corrutina se quedaba
+	# suspendida sin reanudarse en algunas ejecuciones, y la captura no salía.
+	RenderingServer.frame_post_draw.connect(_save_shot, CONNECT_ONE_SHOT)
+
+
+func _save_shot() -> void:
 	get_viewport().get_texture().get_image().save_png("res://shot.png")
 	print("captura guardada")
 	get_tree().quit()
