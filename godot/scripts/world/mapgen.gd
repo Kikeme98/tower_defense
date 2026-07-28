@@ -27,6 +27,22 @@ class Route extends RefCounted:
 	var spawn = null
 	var sealed := false
 
+	## Ruta de vuelo: los mismos puntos, muestreados de N en N. El volador sigue
+	## el trazado general cortando las curvas, así que es más rápido y más
+	## difícil de cubrir, pero no ignora la defensa construida. Uno que fuese en
+	## línea recta al núcleo volvería irrelevante el mapa entero.
+	##
+	## Se recalcula en cada aparición en vez de guardarse: las rutas se alargan al
+	## expandir el mapa, y un caché habría que invalidarlo desde cuatro sitios.
+	func fly_path(stride := 6) -> Array:
+		var out: Array = [cells[0]]
+		var i := stride
+		while i < cells.size() - 1:
+			out.append(cells[i])
+			i += stride
+		out.append(cells[cells.size() - 1])
+		return out
+
 
 var rng: Rng
 var seed_value: int
@@ -188,6 +204,11 @@ func _mark_path(x: int, y: int):
 
 func _unmark_path(c) -> void:
 	c.path = false
+	# Una casilla con torre no se borra nunca: la torre guarda una referencia
+	# débil a su celda, y quitarla del mapa la dejaría huérfana y sin poder
+	# recalcular sus estadísticas. `_walk` ya las evita, pero esto lo garantiza.
+	if c.tower != null:
+		return
 	grid.cells.erase(Grid.key(c.x, c.y))
 
 
@@ -215,6 +236,11 @@ func _walk(start, dir: int, steps: int, route: Route, force_straight_start: bool
 			var ny: int = cur.y + DIRS[nd].y
 			var existing := grid.get_cell(nx, ny)
 			if existing != null and existing.path:
+				continue
+			# Lo construido no se lo lleva el mapa por delante: al crecer, el
+			# camino rodea las torres. Si el jugador acaba cercando un portal,
+			# la ruta se sella, que es una jugada legítima y ya está prevista.
+			if existing != null and existing.tower != null:
 				continue
 			# Regla clave: la casilla nueva no puede tocar otro camino (salvo el
 			# que venimos recorriendo). Sin esto los caminos se funden en manchas.

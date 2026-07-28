@@ -25,6 +25,7 @@ var idx := 0
 var t := 0.0
 var lane := 0.0
 var flying := false
+var fly_height := 0.0
 
 var max_health := 0.0
 var max_armor := 0.0
@@ -53,11 +54,17 @@ var heading := 0.0
 func spawn(d: Dictionary, r, wave: int, sector: int, ln: float, mods := {}) -> Enemy:
 	def = d
 	route = r
-	path = r.cells
 	idx = 0
 	t = 0.0
 	lane = ln
 	flying = d.get("flying", false)
+	# Los voladores cortan las curvas del camino, pero no lo abandonan: recorren
+	# el mismo trazado muestreado. Uno que volase recto al núcleo dejaría sin
+	# efecto toda la defensa construida.
+	path = r.fly_path() if flying else r.cells
+	# Cada volador a su altura, según su carril: apilados se solapan y no se
+	# distingue cuántos vienen.
+	fly_height = 4.2 + (ln + 1.0) * 1.1
 
 	var s := Balance.hp_scale(wave, sector) * float(mods.get("hp", 1.0))
 	var armor_boost := 1.0 + float(mods.get("armor_boost", 0.0))
@@ -73,7 +80,9 @@ func spawn(d: Dictionary, r, wave: int, sector: int, ln: float, mods := {}) -> E
 	gold = int(round(float(d["gold"]) * Balance.gold_scale(wave) \
 		* (Balance.BOSS_GOLD_MULT if d.get("boss", false) else 1.0) \
 		* float(mods.get("gold", 1.0))))
-	size = float(d["size"])
+	# Los jefes crecen con el sector: se distinguen de un vistazo de la horda que
+	# los acompaña, que a esas alturas ya tiene mucha vida.
+	size = float(d["size"]) * (1.0 + minf(float(sector) * 0.05, 0.7) if d.get("boss", false) else 1.0)
 
 	slow = 0.0
 	dot = {"bleed": 0.0, "burn": 0.0, "poison": 0.0}
@@ -88,7 +97,7 @@ func spawn(d: Dictionary, r, wave: int, sector: int, ln: float, mods := {}) -> E
 	var c0 = path[0]
 	x = c0.wx
 	z = c0.wz
-	y = c0.wy
+	y = c0.wy + (fly_height if flying else 0.0)
 	return self
 
 
@@ -223,4 +232,7 @@ func update(dt: float) -> void:
 	x = a2.wx + nx * t + px * off
 	z = a2.wz + nz * t + pz * off
 	y = a2.wy + (b2.wy - a2.wy) * t
+	if flying:
+		# Cabeceo suave: sin él un volador es una caja deslizándose por el aire.
+		y += fly_height + sin(gait * 0.9 + lane * 4.0) * 0.35
 	heading = atan2(nx, nz)

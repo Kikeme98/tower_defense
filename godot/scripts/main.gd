@@ -1,71 +1,88 @@
 extends Node3D
 
-## Escena de juego. Por ahora monta el mundo generado y lo enseña.
+## Escena de juego: monta la partida y la dibuja.
 ##
-## Todo se construye por código en vez de con escenas del editor: permite
-## verificar el resultado ejecutando en headless y guardando una captura, sin
-## depender de abrir el editor para cada cambio.
+## Todo se construye por código en vez de con escenas del editor. Así el juego
+## entero se puede arrancar en headless y guardar una captura, sin depender de
+## abrir el editor para comprobar cada cambio.
 
-const MapGenScript = preload("res://scripts/world/mapgen.gd")
+const RunScript = preload("res://scripts/game/run.gd")
 const TerrainViewScript = preload("res://scripts/world/terrain_view.gd")
 const EnemyViewScript = preload("res://scripts/enemy_view.gd")
-const EnemyScript = preload("res://scripts/game/enemy.gd")
-const WavesScript = preload("res://scripts/game/waves.gd")
-const RngScript = preload("res://scripts/core/rng.gd")
+const BattleViewScript = preload("res://scripts/battle_view.gd")
+const TowerDefsScript = preload("res://scripts/game/tower_defs.gd")
+const GridScript = preload("res://scripts/world/grid.gd")
+const CameraRigScript = preload("res://scripts/camera_rig.gd")
+const MarkersViewScript = preload("res://scripts/markers_view.gd")
 
-## Bestiario mínimo para ver la oleada en marcha. El catálogo completo vive en
-## la versión web y se portará junto con el resto del combate.
-const ENEMY_DEFS := [
-	{"id": "grunt", "hp": 55, "armor": 0, "shield": 0, "speed": 2.6, "gold": 7,
-	 "size": 0.5, "from": 1, "weight": 10, "color": Color8(0xc0, 0x55, 0x4a)},
-	{"id": "runner", "hp": 30, "armor": 0, "shield": 0, "speed": 5.4, "gold": 6,
-	 "size": 0.42, "from": 3, "weight": 7, "color": Color8(0xe0, 0xa0, 0x3a)},
-	{"id": "brute", "hp": 260, "armor": 0, "shield": 0, "speed": 1.7, "gold": 20,
-	 "size": 0.78, "from": 5, "weight": 5, "color": Color8(0x8a, 0x4a, 0xc0),
-	 "regen": {"health": 0.05}},
-	{"id": "armored", "hp": 70, "armor": 185, "shield": 0, "speed": 2.1, "gold": 18,
-	 "size": 0.62, "from": 8, "weight": 5, "color": Color8(0x6a, 0x7a, 0x8a)},
-]
-const BOSS_DEF := {"id": "boss", "hp": 1400, "armor": 900, "shield": 900, "speed": 1.25,
-	"gold": 140, "size": 1.6, "boss": true, "color": Color8(0xff, 0x3a, 0x5a)}
-
-var map
+var run
 var terrain: Node3D
-var cam: Camera3D
-var enemy_view: EnemyView
-var director: WaveDirector
-var enemies: Array = []
-var leaked := 0
+var enemy_view
+var battle_view
+var markers
+var rig
+var _map_version := -1
 
 
 func _ready() -> void:
 	var args := OS.get_cmdline_user_args()
 	var seed_text := "godot"
-	var sectors := 4
+	var sectors := 0
 	for a in args:
 		if a.begins_with("--seed="):
 			seed_text = a.substr(7)
 		elif a.begins_with("--sectors="):
 			sectors = int(a.substr(10))
 
-	map = MapGenScript.new(seed_text).generate_initial()
+	run = RunScript.new(seed_text)
 	for i in sectors:
-		map.expand()
+		run.map.expand()
 
 	terrain = TerrainViewScript.new()
 	add_child(terrain)
-	terrain.build(map.grid)
-
 	enemy_view = EnemyViewScript.new()
 	add_child(enemy_view)
-
-	# Se lanza una oleada para ver el conjunto en movimiento.
-	director = WavesScript.new(RngScript.new("oleada"))
-	director.start(9, map.level, map.routes, {}, ENEMY_DEFS, BOSS_DEF)
+	battle_view = BattleViewScript.new()
+	add_child(battle_view)
+	markers = MarkersViewScript.new()
+	add_child(markers)
 
 	_setup_world()
-	print("mapa: %d casillas · %d rutas · sector %d · oleada de %d enemigos"
-		% [map.grid.cells.size(), map.routes.size(), map.level, director.queue.size()])
+	# El destello del núcleo al recibir un golpe se dispara desde la partida:
+	# la vista no tiene por qué saber por qué ha pasado.
+	run.changed.connect(func(what: String):
+		if what == "damage":
+			markers.hit())
+
+	# En modo captura se planta una defensa y se lanza una oleada: una foto del
+	# mapa vacío no dice si el juego funciona.
+	if "--shot" in args:
+		_seed_defense()
+		run.start_wave()
+
+	print("mapa: %d casillas · %d rutas · sector %d · %d torres"
+		% [run.grid.cells.size(), run.map.routes.size(), run.map.level,
+			run.battle.towers.size()])
+
+
+## Planta unas cuantas torres variadas junto al camino, sin cobrar. Sólo para
+## las capturas de comprobación; el jugador construye con el ratón.
+func _seed_defense() -> void:
+	var ids := ["crossbow", "cannon", "frost", "tesla", "ballista", "mortar"]
+	var built := 0
+	# Repartidas a lo largo de las rutas, no amontonadas donde caiga: si están
+	# todas en un rincón la captura no enseña ni un disparo.
+	for r in run.map.routes:
+		var i := 3
+		while i < r.cells.size() - 3:
+			var here = r.cells[i]
+			for n in run.grid.neighbors(here.x, here.y):
+				if n.path or n.tower != null or not GridScript.is_buildable(n.terrain):
+					continue
+				run.battle.place(TowerDefsScript.by_id(ids[built % ids.size()]), n)
+				built += 1
+				break
+			i += 5
 
 
 func _setup_world() -> void:
@@ -91,66 +108,63 @@ func _setup_world() -> void:
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
 	env.ambient_light_sky_contribution = 0.25
 	env.ambient_light_energy = 0.5
+	# Niebla muy suave y sólo a partir de cierta distancia: con niebla por
+	# densidad el mapa entero se lavaba de gris, porque la cámara está lejos
+	# incluso mirando el centro.
 	env.fog_enabled = true
-	env.fog_density = 0.006
-	env.fog_light_color = Color8(0x8f, 0xac, 0xcc)
+	env.fog_mode = Environment.FOG_MODE_DEPTH
+	env.fog_depth_begin = 120.0
+	env.fog_depth_end = 400.0
+	env.fog_density = 0.55
+	env.fog_light_color = Color8(0x9f, 0xb8, 0xd4)
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 0.85
+	env.tonemap_exposure = 0.9
 
 	var we := WorldEnvironment.new()
 	we.environment = env
 	add_child(we)
 
-	cam = Camera3D.new()
-	cam.fov = 50.0
-	add_child(cam)
-	_frame_map()
-
-
-## Encuadra el mapa entero desde una vista isométrica.
-func _frame_map() -> void:
-	var r: float = maxf(map.grid.radius, 20.0)
-	var dist: float = r * 1.5
-	var yaw := deg_to_rad(35.0)
-	var pitch := deg_to_rad(48.0)
-	cam.position = Vector3(
-		sin(yaw) * cos(pitch) * dist,
-		sin(pitch) * dist,
-		cos(yaw) * cos(pitch) * dist)
-	cam.look_at(Vector3.ZERO, Vector3.UP)
+	rig = CameraRigScript.new()
+	add_child(rig)
+	rig.frame(run.grid)
 
 
 func _physics_process(delta: float) -> void:
-	director.update(delta, func(s):
-		var e = EnemyScript.new().spawn(s["def"], s["route"], 9, map.level,
-			float(s["lane"]), {"hp": float(s["hp"])})
-		enemies.append(e))
-
-	for i in range(enemies.size() - 1, -1, -1):
-		var e = enemies[i]
-		e.update(delta)
-		if not e.alive:
-			if e.reached_core:
-				leaked += 1
-			enemies.remove_at(i)
-	enemy_view.draw_enemies(enemies)
+	run.update(delta)
 
 
 func _process(_delta: float) -> void:
-	# Modo captura: renderiza unos frames, guarda una imagen y sale. Es lo que
-	# permite ver el resultado sin abrir el editor ni una ventana.
-	if not "--shot" in OS.get_cmdline_user_args():
+	# La malla del terreno sólo se rehace cuando el mapa cambia de verdad:
+	# reconstruirla cada frame costaría más que dibujarla.
+	if run.grid.version != _map_version:
+		_map_version = run.grid.version
+		terrain.build(run.grid)
+		markers.sync(run.map)
+		rig.frame(run.grid)
+
+	enemy_view.draw_enemies(run.battle.enemies)
+	battle_view.draw(run.battle)
+	_maybe_shot()
+
+
+func _maybe_shot() -> void:
+	if _shot_done or not "--shot" in OS.get_cmdline_user_args():
 		return
 	_shot_frames += 1
 	# Se deja avanzar la oleada para que los enemigos salgan de los portales y
-	# se vean recorriendo el camino: una foto del primer frame no diría nada.
-	if _shot_frames < 200:
+	# entren en el alcance de las torres: una foto del primer frame no diría nada.
+	if _shot_frames < 260:
 		return
-	print("en marcha: %d enemigos · %d llegaron al núcleo" % [enemies.size(), leaked])
+	# El await deja pasar un frame más, y sin la bandera la captura se guardaba
+	# dos veces antes de que llegase el quit.
+	_shot_done = true
+	print("oleada %d · %d enemigos · %d disparos · %d de oro · %d vidas"
+		% [run.state["wave"], run.battle.enemies.size(), run.battle.projectiles.size(),
+			run.gold, run.lives])
 	await RenderingServer.frame_post_draw
-	var img := get_viewport().get_texture().get_image()
-	img.save_png("res://shot.png")
+	get_viewport().get_texture().get_image().save_png("res://shot.png")
 	print("captura guardada")
 	get_tree().quit()
 
 var _shot_frames := 0
+var _shot_done := false
